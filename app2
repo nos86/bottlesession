@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+
+from bottle import route, view, post
+import bottle, bottlesession
+
+
+####################
+#session_manager = bottlesession.PickleSession()
+session_manager = bottlesession.CookieSession()
+valid_user = bottlesession.authenticator(session_manager)
+
+@route('/')
+@route('/:name')
+@valid_user()
+def hello(name = 'world'):
+	return '<h1>Hello %s!</h1>' % name.title()
+
+@route('/auth/login')
+@post('/auth/login')
+@view('html/login.html')
+def login():
+   passwds = { 'guest' : 'guest' }
+
+   username = bottle.request.forms.get('username')
+   password = bottle.request.forms.get('password')
+
+   if not username or not password:
+      return { 'error' : 'Please specify username and password' }
+
+   session = session_manager.get_session()
+   session['valid'] = False
+
+   if password and passwds.get(username) == password:
+      session['valid'] = True
+      session['name'] = username
+
+   session_manager.save(session)
+   if not session['valid']:
+      return { 'error' : 'Username or password is invalid' }
+
+   bottle.redirect(bottle.request.get_cookie('validuserloginredirect', '/'))
+
+@route('/auth/logout')
+def logout():
+	session = session_manager.get_session()
+	session['valid'] = False
+	session_manager.save(session)
+
+
+##################
+app = bottle.app()
+if __name__ == '__main__':
+	bottle.debug(True)
+	bottle.run(app = app)
